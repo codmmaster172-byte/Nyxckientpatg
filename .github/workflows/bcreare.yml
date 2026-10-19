@@ -1,0 +1,79 @@
+
+name: Build NyxClient 2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Show repository files
+        run: |
+          echo "Repository root:"
+          pwd
+          echo "Files and build scripts:"
+          find . -maxdepth 5 -type f \
+            \( -name 'build.gradle' \
+            -o -name 'build.gradle.kts' \
+            -o -name 'settings.gradle' \
+            -o -name 'gradlew' \
+            -o -name 'pom.xml' \) -print
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Build with Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUILD_FILE="$(find . -maxdepth 5 -type f \
+            \( -name 'build.gradle' \
+            -o -name 'build.gradle.kts' \) \
+            -not -path './.github/*' \
+            -print -quit)"
+
+          if [ -z "$BUILD_FILE" ]; then
+            echo "::error::No Gradle build file found. Check the source ZIP and repository folder structure."
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$BUILD_FILE")"
+          cd "$PROJECT_DIR"
+
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon build
+          elif [ -f ./gradlew.bat ]; then
+            echo "::error::Windows-only Gradle wrapper found. Use a Linux-compatible wrapper or install a compatible Gradle version."
+            exit 1
+          else
+            echo "::error::No Gradle wrapper found. A compatible Gradle installation is required."
+            exit 1
+          fi
+
+      - name: Upload JAR artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nyxclient-2.0-jar
+          path: |
+            **/build/libs/*.jar
+          if-no-files-found: error
+          
