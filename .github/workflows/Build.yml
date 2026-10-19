@@ -1,0 +1,48 @@
+
+name: Build NyxClient
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: gradle
+
+      - name: Grant Gradle permission
+        run: chmod +x gradlew
+        if: ${{ hashFiles('gradlew') != '' }}
+
+      - name: Build JAR
+        run: |
+          if [ -f ./gradlew ]; then
+            ./gradlew --no-daemon build
+          elif [ -f ./gradlew.bat ]; then
+            gradle --no-daemon build
+          elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then
+            gradle --no-daemon build
+          else
+            echo "No Gradle build file found"
+            exit 1
+          fi
+
+      - name: Upload built JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: NyxClient-JAR
+          path: build/libs/*.jar
+          if-no-files-found: error
+          
